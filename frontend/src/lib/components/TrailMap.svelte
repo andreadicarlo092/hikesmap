@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import type { TrailFeature } from '$lib/types';
 
   export let trail: TrailFeature;
 
   let container: HTMLDivElement;
+  let mapInstance: any = null;
 
   const difficultyColor: Record<string, string> = {
     T:   '#52b788',
@@ -32,7 +33,7 @@
       if (lat > maxLat) maxLat = lat;
     }
 
-    const map = new maplibregl.Map({
+    mapInstance = new maplibregl.Map({
       container,
       style: {
         version: 8,
@@ -56,15 +57,16 @@
       attributionControl: false,
     });
 
-    map.on('load', () => {
-      const lineColor = difficultyColor[trail.properties.difficulty] ?? '#2d6a4f';
+    mapInstance.on('load', () => {
+      if (!mapInstance) return; // guard against unmount during async load
+      const lineColor = difficultyColor[trail.properties.difficulty ?? 'E'] ?? '#2d6a4f';
 
-      map.addSource('trail-line', {
+      mapInstance.addSource('trail-line', {
         type: 'geojson',
         data: trail,
       });
 
-      map.addLayer({
+      mapInstance.addLayer({
         id: 'trail-line',
         type: 'line',
         source: 'trail-line',
@@ -79,7 +81,7 @@
       });
 
       // Start point (green circle)
-      map.addSource('start-point', {
+      mapInstance.addSource('start-point', {
         type: 'geojson',
         data: {
           type: 'Feature',
@@ -88,7 +90,7 @@
         },
       });
 
-      map.addLayer({
+      mapInstance.addLayer({
         id: 'start-point',
         type: 'circle',
         source: 'start-point',
@@ -101,7 +103,7 @@
       });
 
       // End point (red circle)
-      map.addSource('end-point', {
+      mapInstance.addSource('end-point', {
         type: 'geojson',
         data: {
           type: 'Feature',
@@ -110,7 +112,7 @@
         },
       });
 
-      map.addLayer({
+      mapInstance.addLayer({
         id: 'end-point',
         type: 'circle',
         source: 'end-point',
@@ -122,11 +124,19 @@
         },
       });
 
-      map.fitBounds(
+      mapInstance.fitBounds(
         [[minLng, minLat], [maxLng, maxLat]],
         { padding: 40, animate: false }
       );
     });
+  });
+
+  onDestroy(() => {
+    if (mapInstance) {
+      const m = mapInstance;
+      mapInstance = null; // nullify before remove to prevent post-destroy callbacks
+      m.remove();
+    }
   });
 </script>
 
