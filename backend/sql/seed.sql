@@ -149,7 +149,7 @@ VALUES (
     1200,
     100,
     5.25,
-    '{"surface":"scree","sac_scale":"alpine_hiking","foot":"yes","via_ferrata":"yes"}'::jsonb,
+    '["ferrata", "sentiero attrezzato", "alta quota"]'::jsonb,
     ST_GeomFromText(
         'LINESTRING(7.965 45.969, 7.970 45.978, 7.976 45.990,
                     7.982 46.002, 7.988 46.015, 7.994 46.028,
