@@ -55,9 +55,11 @@
 			<div class="trail-map-container">
 				<TrailMap {trail} />
 			</div>
-			<div class="elevation-container">
-				<ElevationChart profile={elevationProfile} />
-			</div>
+			{#if elevationProfile != null}
+				<div class="elevation-container">
+					<ElevationChart profile={elevationProfile} />
+				</div>
+			{/if}
 		</div>
 
 		<!-- Colonna destra: dettagli -->
@@ -86,7 +88,9 @@
 				<div class="stat-item">
 					<span class="stat-label">Durata stimata</span>
 					<span class="stat-value">
-						{#if props.length_km != null && props.elevation_gain_m != null}
+						{#if props.duration_hours != null}
+							{formatDuration(props.duration_hours, 0)}
+						{:else if props.length_km != null && props.elevation_gain_m != null}
 							{formatDuration(props.length_km, props.elevation_gain_m)}
 						{:else}
 							—
@@ -95,17 +99,29 @@
 				</div>
 				<div class="stat-item">
 					<span class="stat-label">Quota min</span>
-					<span class="stat-value">{elevationProfile.min_alt_m != null ? `${elevationProfile.min_alt_m} m` : '—'}</span>
+					<span class="stat-value">
+						{#if elevationProfile != null && elevationProfile.min_alt_m != null}
+							{elevationProfile.min_alt_m} m
+						{:else}
+							—
+						{/if}
+					</span>
 				</div>
 				<div class="stat-item">
 					<span class="stat-label">Quota max</span>
-					<span class="stat-value">{elevationProfile.max_alt_m != null ? `${elevationProfile.max_alt_m} m` : '—'}</span>
+					<span class="stat-value">
+						{#if elevationProfile != null && elevationProfile.max_alt_m != null}
+							{elevationProfile.max_alt_m} m
+						{:else}
+							—
+						{/if}
+					</span>
 				</div>
 			</div>
 
 			<div class="trail-actions">
 				<a
-					href="/api/v1/trails/{trail.properties.id ?? trail.id}/gpx"
+					href="/api/v1/trails/{trail.properties.id}/gpx"
 					class="btn btn-primary"
 					download
 				>
