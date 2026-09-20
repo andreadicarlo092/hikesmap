@@ -1,0 +1,59 @@
+# --- Python / ETL / API ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# --- Variabili d'ambiente e segreti ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# --- Dati ETL (file pesanti, non vanno in git) ---
+etl/data/raw/
+etl/data/processed/
+*.osm.pbf
+*.osm
+*.pbf
+*.mbtiles
+*.pmtiles
+*.tif
+*.tiff
+
+# --- Node.js / Frontend ---
+node_modules/
+.svelte-kit/
+build/
+.vercel/
+.env.local
+.env.*.local
+
+# --- Database ---
+*.sql.bak
+pgdata/
+
+# --- Docker ---
+docker/volumes/
+
+# --- Editor e OS ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
