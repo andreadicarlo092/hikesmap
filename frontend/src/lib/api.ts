@@ -7,7 +7,7 @@
  */
 
 import { env } from '$env/dynamic/public';
-import type { Trail, Trailhead, ElevationProfile, TrailFeature } from './types';
+import type { Trail, ElevationProfile, TrailFeature } from './types';
 
 function baseUrl(): string {
   const url = env.PUBLIC_API_URL ?? '';
@@ -34,7 +34,7 @@ export function fetchTrailheads(
 ): Promise<GeoJSON.FeatureCollection> {
   const [west, south, east, north] = bbox;
   return apiFetch<GeoJSON.FeatureCollection>(
-    `/trailheads?bbox=${west},${south},${east},${north}`
+    `/api/v1/trailheads?bbox=${west},${south},${east},${north}`
   );
 }
 
@@ -43,7 +43,7 @@ export function fetchTrailheads(
  * @param id Trailhead numeric ID
  */
 export function fetchTrailheadTrails(id: number): Promise<Trail[]> {
-  return apiFetch<Trail[]>(`/trailheads/${id}/trails`);
+  return apiFetch<Trail[]>(`/api/v1/trailheads/${id}/trails`);
 }
 
 /**
@@ -51,13 +51,33 @@ export function fetchTrailheadTrails(id: number): Promise<Trail[]> {
  * @param id Trail numeric ID
  */
 export function fetchTrail(id: number): Promise<TrailFeature> {
-  return apiFetch<TrailFeature>(`/trails/${id}`);
+  return apiFetch<TrailFeature>(`/api/v1/trails/${id}`);
 }
 
 /**
  * Fetch the elevation profile for a trail.
+ * Returns null if the trail has no elevation data (404).
  * @param id Trail numeric ID
  */
-export function fetchElevationProfile(id: number): Promise<ElevationProfile> {
-  return apiFetch<ElevationProfile>(`/trails/${id}/elevation`);
+export async function fetchElevationProfile(id: number): Promise<ElevationProfile | null> {
+  const url = `${baseUrl()}/api/v1/trails/${id}/elevation`;
+  const res = await fetch(url);
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`API error ${res.status} on /api/v1/trails/${id}/elevation: ${await res.text()}`);
+  }
+  return res.json() as Promise<ElevationProfile>;
+}
+
+/** GeoJSON FeatureCollection con geometria semplificata del sentiero + bbox opzionale */
+export interface TrailGeometryCollection extends GeoJSON.FeatureCollection {
+  bbox?: [number, number, number, number];
+}
+
+/**
+ * Fetch simplified geometry for a trail (for map rendering).
+ * @param id Trail numeric ID
+ */
+export function fetchTrailGeometry(id: number): Promise<TrailGeometryCollection> {
+  return apiFetch<TrailGeometryCollection>(`/api/v1/trails/${id}/geometry`);
 }
