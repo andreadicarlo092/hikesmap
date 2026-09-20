@@ -11,6 +11,7 @@ Sicurezza:
   - Non usare MD5 o SHA1 — vulnerabili a collision attack
 """
 
+import asyncio
 import hashlib
 import os
 import httpx
@@ -20,6 +21,10 @@ from pathlib import Path
 log = structlog.get_logger()
 
 RAW_DIR = Path(__file__).parent / "data" / "raw"
+
+# Dimensione minima accettabile per un tile DEM (~5 MB).
+# Un tile reale pesa 20-80 MB; sotto questa soglia il file è corrotto o troncato.
+MIN_DEM_TILE_SIZE_BYTES = 5 * 1024 * 1024
 
 # ---------------------------------------------------------------------------
 # Sorgenti OSM — Geofabrik, Nord Italia
@@ -39,26 +44,18 @@ OSM_SOURCES = {
 
 # ---------------------------------------------------------------------------
 # Sorgenti DEM — Copernicus GLO-30
-# I tile coprono il Nord Italia (latitudine 44-47, longitudine 6-14).
+# I tile coprono il Nord Italia (latitudine N44-N47, longitudine E006-E013).
 # URL base: https://copernicus-dem-30m.s3.amazonaws.com/
 # ---------------------------------------------------------------------------
 DEM_TILE_PATTERN = "Copernicus_DSM_COG_10_{lat}_{lon}_DEM.tif"
 DEM_BASE_URL = "https://copernicus-dem-30m.s3.amazonaws.com"
 
-# Tile necessari per il Nord Italia
+# Tile necessari per il Nord Italia (N44 -> N47 incluso per coprire Trentino,
+# Alto Adige e Friuli fino al confine con Austria e Slovenia)
 DEM_TILES = [
-    {"lat": "N44", "lon": "E006"}, {"lat": "N44", "lon": "E007"},
-    {"lat": "N44", "lon": "E008"}, {"lat": "N44", "lon": "E009"},
-    {"lat": "N44", "lon": "E010"}, {"lat": "N44", "lon": "E011"},
-    {"lat": "N44", "lon": "E012"}, {"lat": "N44", "lon": "E013"},
-    {"lat": "N45", "lon": "E006"}, {"lat": "N45", "lon": "E007"},
-    {"lat": "N45", "lon": "E008"}, {"lat": "N45", "lon": "E009"},
-    {"lat": "N45", "lon": "E010"}, {"lat": "N45", "lon": "E011"},
-    {"lat": "N45", "lon": "E012"}, {"lat": "N45", "lon": "E013"},
-    {"lat": "N46", "lon": "E006"}, {"lat": "N46", "lon": "E007"},
-    {"lat": "N46", "lon": "E008"}, {"lat": "N46", "lon": "E009"},
-    {"lat": "N46", "lon": "E010"}, {"lat": "N46", "lon": "E011"},
-    {"lat": "N46", "lon": "E012"}, {"lat": "N46", "lon": "E013"},
+    {"lat": lat, "lon": lon}
+    for lat in ("N44", "N45", "N46", "N47")
+    for lon in ("E006", "E007", "E008", "E009", "E010", "E011", "E012", "E013")
 ]
 
 
@@ -87,20 +84,27 @@ def verify_sha256(path: Path, expected: str | None) -> bool:
     return True
 
 
-async def download_file(url: str, dest: Path, expected_sha256: str | None = None) -> Path:
+async def download_file(
+    url: str,
+    dest: Path,
+    expected_sha256: str | None = None,
+    min_size_bytes: int | None = None,
+) -> Path:
     """
     Scarica un file con progress logging e verifica SHA256.
-    Salta il download se il file esiste già e il checksum è valido.
+    Salta il download se il file esiste già, il checksum è valido
+    e la dimensione supera min_size_bytes.
     """
     dest.parent.mkdir(parents=True, exist_ok=True)
 
     if dest.exists():
-        log.info("download.skip_existing", path=str(dest))
-        if not verify_sha256(dest, expected_sha256):
-            log.warning("download.redownloading", path=str(dest), reason="checksum mismatch")
-            dest.unlink()
-        else:
+        size_ok = (min_size_bytes is None or dest.stat().st_size >= min_size_bytes)
+        if size_ok and verify_sha256(dest, expected_sha256):
+            log.info("download.skip_existing", path=str(dest))
             return dest
+        log.warning("download.redownloading", path=str(dest),
+                    reason="checksum mismatch or file too small")
+        dest.unlink()
 
     log.info("download.start", url=url, dest=str(dest))
     async with httpx.AsyncClient(follow_redirects=True, timeout=3600) as client:
@@ -112,10 +116,18 @@ async def download_file(url: str, dest: Path, expected_sha256: str | None = None
                 async for chunk in response.aiter_bytes(chunk_size=65536):
                     f.write(chunk)
                     downloaded += len(chunk)
-                    if total:
-                        pct = downloaded / total * 100
-                        if downloaded % (50 * 1024 * 1024) < 65536:  # log ogni ~50MB
-                            log.info("download.progress", url=url, pct=f"{pct:.1f}%")
+                    if total and downloaded % (50 * 1024 * 1024) < 65536:
+                        log.info("download.progress", url=url,
+                                 pct=f"{downloaded / total * 100:.1f}%")
+
+    # Verifica dimensione minima
+    if min_size_bytes and dest.stat().st_size < min_size_bytes:
+        dest.unlink()
+        raise RuntimeError(
+            f"File troppo piccolo dopo il download: {dest} "
+            f"({dest.stat().st_size if dest.exists() else 0} B < {min_size_bytes} B attesi). "
+            "Probabile errore di rete o risposta non valida dal server."
+        )
 
     if not verify_sha256(dest, expected_sha256):
         dest.unlink()
@@ -126,7 +138,7 @@ async def download_file(url: str, dest: Path, expected_sha256: str | None = None
 
 
 async def download_osm() -> list[Path]:
-    """Scarica tutti i file OSM del Nord Italia."""
+    """Scarica tutti i file OSM del Nord Italia (sequenziale — file grandi)."""
     paths = []
     for region, source in OSM_SOURCES.items():
         filename = source["url"].split("/")[-1]
@@ -136,14 +148,35 @@ async def download_osm() -> list[Path]:
     return paths
 
 
+async def _download_dem_tile(tile: dict) -> Path | None:
+    """
+    Scarica un singolo tile DEM. Restituisce None (senza sollevare eccezione)
+    se il tile non è disponibile sul server — alcuni tile ai bordi del bbox
+    possono non esistere nel dataset Copernicus.
+    """
+    filename = DEM_TILE_PATTERN.format(**tile)
+    url = f"{DEM_BASE_URL}/{filename}/{filename}"
+    dest = RAW_DIR / "dem" / filename
+    try:
+        return await download_file(url, dest, expected_sha256=None,
+                                   min_size_bytes=MIN_DEM_TILE_SIZE_BYTES)
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            log.warning("dem.tile_not_found", tile=filename, url=url)
+            return None
+        raise
+    except Exception as e:
+        log.error("dem.tile_error", tile=filename, error=str(e))
+        return None
+
+
 async def download_dem() -> list[Path]:
-    """Scarica i tile DEM Copernicus per il Nord Italia."""
-    paths = []
-    for tile in DEM_TILES:
-        filename = DEM_TILE_PATTERN.format(**tile)
-        url = f"{DEM_BASE_URL}/{filename}/{filename}"
-        dest = RAW_DIR / "dem" / filename
-        # I tile DEM non hanno hash pubblicati — verifica di integrità tramite dimensione minima
-        path = await download_file(url, dest, expected_sha256=None)
-        paths.append(path)
+    """
+    Scarica i tile DEM Copernicus per il Nord Italia in parallelo.
+    I tile non disponibili vengono saltati con un warning.
+    """
+    results = await asyncio.gather(*(_download_dem_tile(t) for t in DEM_TILES))
+    paths = [p for p in results if p is not None]
+    log.info("dem.download_complete", total=len(DEM_TILES), downloaded=len(paths),
+             skipped=len(DEM_TILES) - len(paths))
     return paths
