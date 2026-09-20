@@ -3,18 +3,12 @@
   import MapView from '$lib/components/MapView.svelte';
   import TrailheadPanel from '$lib/components/TrailheadPanel.svelte';
 
-  export const ssr = false;
-
   let selectedTrailheadId: number | null = null;
   let selectedTrailId: number | null = null;
 
   function handleTrailheadClick(event: CustomEvent<{ id: number }>) {
     selectedTrailheadId = event.detail.id;
     selectedTrailId = null;
-  }
-
-  function handleTrailSelect(event: CustomEvent<{ id: number }>) {
-    selectedTrailId = event.detail.id;
   }
 
   function closePanel() {
@@ -32,7 +26,6 @@
     <MapView
       {selectedTrailId}
       on:trailheadClick={handleTrailheadClick}
-      on:trailSelect={handleTrailSelect}
     />
   {/if}
 
@@ -42,7 +35,8 @@
       <TrailheadPanel
         trailheadId={selectedTrailheadId}
         {selectedTrailId}
-        on:trailSelect={handleTrailSelect}
+        onTrailSelect={(id) => { selectedTrailId = id; }}
+        onClose={closePanel}
       />
     </div>
   {/if}
