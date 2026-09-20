@@ -1,8 +1,9 @@
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 import type { TrailFeature, ElevationProfile } from '$lib/types';
+import { env } from '$env/dynamic/private';
 
-const API_URL = process.env.API_URL ?? 'http://localhost:8000';
+const API_URL = env.API_URL ?? 'http://localhost:8000';
 
 async function fetchTrail(id: string, fetch: typeof globalThis.fetch): Promise<TrailFeature> {
 	const res = await fetch(`${API_URL}/api/v1/trails/${id}`);
@@ -15,10 +16,18 @@ async function fetchTrail(id: string, fetch: typeof globalThis.fetch): Promise<T
 	return res.json();
 }
 
-async function fetchElevationProfile(id: string, fetch: typeof globalThis.fetch): Promise<ElevationProfile> {
+/**
+ * Fetch elevation profile for a trail.
+ * Returns null when the trail has no DEM data (404) instead of throwing,
+ * so the detail page can still render without crashing.
+ */
+async function fetchElevationProfile(
+	id: string,
+	fetch: typeof globalThis.fetch
+): Promise<ElevationProfile | null> {
 	const res = await fetch(`${API_URL}/api/v1/trails/${id}/elevation`);
 	if (res.status === 404) {
-		throw error(404, 'Sentiero non trovato');
+		return null;
 	}
 	if (!res.ok) {
 		throw error(res.status, `Errore nel recupero del profilo altimetrico: ${res.statusText}`);
