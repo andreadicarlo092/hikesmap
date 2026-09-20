@@ -2,31 +2,31 @@ import os
 from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from api.config import settings
 from api.database import connect, disconnect, get_pool
 from api.models import TrailList
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.is_production and not settings.cors_origins:
+        raise RuntimeError("CORS_ORIGINS non configurato in produzione")
     await connect()
     yield
     await disconnect()
 
+
 app = FastAPI(
     title="hikesmap API",
     version="0.1.0",
-    docs_url=None if os.getenv("ENV") == "production" else "/docs",
-    redoc_url=None if os.getenv("ENV") == "production" else "/redoc",
+    docs_url=None if settings.is_production else "/docs",
+    redoc_url=None if settings.is_production else "/redoc",
     lifespan=lifespan,
 )
 
-# CORS: accetta richieste solo dal frontend autorizzato
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173")
-if not CORS_ORIGINS and os.getenv("ENV") == "production":
-    raise RuntimeError("CORS_ORIGINS non configurato in produzione")
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS.split(","),
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["GET"],
     allow_headers=["*"],
@@ -43,14 +43,13 @@ async def health():
 async def list_trails(
     bbox: str | None = Query(None, description="minLon,minLat,maxLon,maxLat"),
     difficulty: str | None = Query(None, description="T1..T6 scala CAI"),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(50, ge=1, le=settings.max_trails_per_request),
 ):
     """
     Restituisce la lista dei sentieri filtrati per area geografica e difficoltà.
     """
     pool = get_pool()
 
-    # Costruzione query con parametri (mai interpolazione diretta — SQL injection)
     conditions = []
     params = []
 
@@ -74,7 +73,6 @@ async def list_trails(
     where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
     params.append(limit)
 
-    # TODO: aggiungere SELECT completo con tutti i campi del modello Trail
     rows = await pool.fetch(
         f"SELECT id, osm_id, name, ref, difficulty FROM trails {where} LIMIT ${len(params)}",
         *params
