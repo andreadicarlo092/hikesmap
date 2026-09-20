@@ -35,7 +35,7 @@ VALUES (
     450,
     450,
     3.1,
-    '{"surface":"ground","sac_scale":"hiking","foot":"yes"}'::jsonb,
+    '["circolare", "adatto famiglie"]'::jsonb,
     ST_GeomFromText(
         'LINESTRING(8.278 46.302, 8.283 46.308, 8.290 46.315,
                     8.298 46.318, 8.305 46.322, 8.310 46.318,
@@ -72,7 +72,7 @@ VALUES (
     700,
     200,
     3.25,
-    '{"surface":"rocky","sac_scale":"mountain_hiking","foot":"yes"}'::jsonb,
+    '["anello", "panoramico"]'::jsonb,
     ST_GeomFromText(
         'LINESTRING(8.278 46.302, 8.270 46.310, 8.263 46.320,
                     8.258 46.332, 8.252 46.345, 8.248 46.358,
@@ -109,7 +109,7 @@ VALUES (
     1100,
     600,
     6.25,
-    '{"surface":"rocky","sac_scale":"demanding_mountain_hiking","foot":"yes"}'::jsonb,
+    '["alta quota", "panoramico"]'::jsonb,
     ST_GeomFromText(
         'LINESTRING(8.464 46.025, 8.452 46.038, 8.440 46.052,
                     8.430 46.068, 8.418 46.082, 8.405 46.096,
@@ -186,7 +186,7 @@ VALUES (
     280,
     280,
     1.8,
-    '{"surface":"ground","sac_scale":"hiking","foot":"yes","dog":"yes"}'::jsonb,
+    '["adatto famiglie", "panoramico"]'::jsonb,
     ST_GeomFromText(
         'LINESTRING(8.278 46.302, 8.282 46.307, 8.287 46.311,
                     8.292 46.315, 8.296 46.320, 8.300 46.325,
@@ -223,7 +223,7 @@ VALUES (
     900,
     1100,
     6.75,
-    '{"surface":"ground","sac_scale":"mountain_hiking","foot":"yes"}'::jsonb,
+    '["lungo", "alta quota"]'::jsonb,
     ST_GeomFromText(
         'LINESTRING(8.464 46.025, 8.478 46.018, 8.492 46.010,
                     8.506 46.000, 8.520 45.990, 8.534 45.978,
