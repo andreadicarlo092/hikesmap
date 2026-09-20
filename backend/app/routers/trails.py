@@ -50,7 +50,7 @@ async def get_trail(
             elevation_gain_m=row["elevation_gain_m"],
             elevation_loss_m=row["elevation_loss_m"],
             duration_hours=row["duration_hours"],
-            tags=list(row["tags"]) if row["tags"] else None,
+            tags=row["tags"] if row["tags"] is not None else [],
             osm_url=row["osm_url"],
         ),
     )
