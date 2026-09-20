@@ -10,24 +10,39 @@ export interface Trail {
   id: number;
   name: string;
   /** CAI route reference, e.g. "101" */
-  cai_ref: string;
-  difficulty: Difficulty;
-  length_km: number;
-  elevation_gain_m: number;
-  elevation_loss_m: number;
+  cai_ref?: string | null;
+  difficulty?: Difficulty | null;
+  length_km?: number | null;
+  elevation_gain_m?: number | null;
+  elevation_loss_m?: number | null;
   /** Estimated walking duration in hours */
-  duration_hours: number;
-  tags: string[];
+  duration_hours?: number | null;
+  tags?: string[] | null;
+  /** OpenStreetMap relation URL */
+  osm_url?: string | null;
 }
 
-/** Summary info for a trailhead (departure point for one or more trails) */
-export interface Trailhead {
+/**
+ * Properties inside a GeoJSON Feature from the trailhead list endpoint.
+ * Corresponds to GET /api/v1/trailheads (FeatureCollection).
+ */
+export interface TrailheadProperties {
   id: number;
   name: string;
   /** Number of trails starting from this trailhead */
   trail_count: number;
-  /** [longitude, latitude] in WGS-84 */
-  coordinates: [number, number];
+}
+
+/**
+ * Full trailhead detail returned by GET /api/v1/trailheads/{id}.
+ * Position is provided as separate lat/lon fields, not as a coordinates array.
+ */
+export interface TrailheadDetail {
+  id: number;
+  name: string;
+  trail_count: number;
+  lat: number;
+  lon: number;
 }
 
 /** One sample of the elevation profile */
@@ -40,6 +55,7 @@ export interface ElevationSample {
 
 /** Full elevation profile for a trail */
 export interface ElevationProfile {
+  /** Array of distance/altitude samples */
   profile: ElevationSample[];
   gain_m: number;
   loss_m: number;
