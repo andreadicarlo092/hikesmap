@@ -57,6 +57,26 @@ services:
   #     - api
   #     - frontend
 
+  etl:
+    build: ./etl
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB:-trailexplorer}
+      - DB_USER=${POSTGRES_USER:-trailexplorer}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-trailexplorer}
+      - ETL_REGION=${ETL_REGION:-piemonte}
+      - ETL_DATA_DIR=/data
+    volumes:
+      - etl_data:/data
+    profiles:
+      - etl
+    restart: "no"
+
 volumes:
   postgres_data:
+  etl_data:
   # certbot_certs:
