@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { onMount, onDestroy } from 'svelte';
+  import { onMount, onDestroy, createEventDispatcher } from 'svelte';
   import { browser } from '$app/environment';
-  import { fetchTrailheadTrails } from '$lib/api';
 
   export let selectedTrailId: number | null = null;
-  export let onTrailheadClick: (id: number) => void = () => {};
+
+  const dispatch = createEventDispatcher<{ trailheadClick: { id: number } }>();
 
   let mapContainer: HTMLDivElement;
   let map: any = null;
@@ -46,6 +46,10 @@
       addTrailLineSource();
       addTrailLineLayer();
       bindEvents();
+      // Apply selectedTrailId that may have been set before map was ready
+      if (selectedTrailId != null) {
+        updateSelectedTrail(selectedTrailId);
+      }
     });
 
     map.on('moveend', () => {
@@ -189,12 +193,12 @@
   }
 
   function bindEvents() {
-    // Click on individual trailhead
+    // Click on individual trailhead — dispatch Svelte event
     map.on('click', 'trailheads-circles', (e: any) => {
       const feature = e.features?.[0];
       if (!feature) return;
       const id = feature.properties?.id;
-      if (id != null) onTrailheadClick(Number(id));
+      if (id != null) dispatch('trailheadClick', { id: Number(id) });
     });
 
     // Click on cluster → zoom in
@@ -264,8 +268,9 @@
 
   onDestroy(() => {
     if (map) {
-      map.remove();
-      map = null;
+      const m = map;
+      map = null; // nullify reference before teardown to prevent post-destroy callbacks
+      m.remove();
     }
   });
 </script>
