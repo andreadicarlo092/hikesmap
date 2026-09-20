@@ -12,8 +12,8 @@
     const { Chart, registerables } = await import('chart.js');
     Chart.register(...registerables);
 
-    const labels = profile.samples.map((s) => s.d_km);
-    const data   = profile.samples.map((s) => s.alt_m);
+    const labels = profile.profile.map((s) => s.d_km);
+    const data   = profile.profile.map((s) => s.alt_m);
 
     chart = new Chart(canvas, {
       type: 'line',
@@ -40,7 +40,7 @@
           tooltip: {
             callbacks: {
               label: (ctx) => {
-                const d = profile.samples[ctx.dataIndex];
+                const d = profile.profile[ctx.dataIndex];
                 return `${d.d_km} km — ${d.alt_m} m`;
               },
             },
